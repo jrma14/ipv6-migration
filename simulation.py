@@ -66,14 +66,17 @@ def ipv6_cross_router():
     r1.cmd('tcpdump -U -w caps/r1.pcap -i r1-wan not ip &')
     r2.cmd('tcpdump -U -w caps/r2.pcap -i r2-wan not ip &')
 
-
+    ### Subnet definitions
+    wannet = '2001:beef::'
+    r1WanAddr = f'{wannet}1:1'
+    r2WanAddr = f'{wannet}1:2'
+    
     subnet1 = '2001:db8::'
-    r1LanAddr = f'{subnet1}1:0'
-    r1WanAddr = f'{subnet1}1:1'
+    r1LanAddr = f'{subnet1}1:0'    
 
     subnet2 = '2002:db8::'
     r2LanAddr = f'{subnet2}1:0'
-    r2WanAddr = f'{subnet2}1:1'
+
     ## ipv6 setup
     r1.cmd(f'ip -6 route add {subnet2}/64 dev r1-wan via {r2WanAddr} onlink')  
     r1.cmd('sysctl -w net.ipv6.conf.all.forwarding=1')
@@ -81,30 +84,22 @@ def ipv6_cross_router():
     r2.cmd(f'ip -6 route add {subnet1}/64 dev r2-wan via {r1WanAddr} onlink')
     r2.cmd('sysctl -w net.ipv6.conf.all.forwarding=1')
 
-
     ### Addrs
     r1.cmd(f'ip -6 addr add {r1LanAddr}/64 dev r1-lan')
-    r1.cmd(f'ip -6 addr add {r1WanAddr}/64 dev r1-wan')
-    r1.cmd(f'ip -6 route del {subnet1}/64 dev r1-wan')
+    r1.cmd(f'ip -6 addr add {r1WanAddr}/128 dev r1-wan')
+    r1.cmd(f'ip -6 route del {r1WanAddr} dev r1-wan')
     
     r2.cmd(f'ip -6 addr add {r2LanAddr}/64 dev r2-lan')
-    r2.cmd(f'ip -6 addr add {r2WanAddr}/64 dev r2-wan')
-    r2.cmd(f'ip -6 route del {subnet2}/64 dev r2-wan')
+    r2.cmd(f'ip -6 addr add {r2WanAddr}/128 dev r2-wan')
+    r2.cmd(f'ip -6 route del {r2WanAddr} dev r2-wan')
 
-    h1.cmd(f'ip -6 addr add {subnet1}2:1/64 dev h1-eth0')
+    h1.cmd(f'ip -6 addr add {subnet1}1:1/64 dev h1-eth0')
     h1.cmd(f'ip -6 route add default via {subnet1}1:0')
-    h2.cmd(f'ip -6 addr add {subnet2}2:1/64 dev h2-eth0')
+    h2.cmd(f'ip -6 addr add {subnet2}1:1/64 dev h2-eth0')
     h2.cmd(f'ip -6 route add default via {subnet2}1:0')
-    h3.cmd(f'ip -6 addr add {subnet1}2:2/64 dev h3-eth0')
+    h3.cmd(f'ip -6 addr add {subnet1}1:2/64 dev h3-eth0')
     h3.cmd(f'ip -6 route add default via {subnet1}1:0')
 
-    # print(h1.cmd('ping6 -c 3 2001:db8::3'))
-
-    # print("IPv4 Ping:")
-    # print(h1.cmd('ping -c 3 10.2.0.2'))
-
-    # print("\nIPv6 Ping:")
-    # print(h1.cmd('ping -c 3 2001:db8::2'))
     CLI(net)
 
     net.stop()
