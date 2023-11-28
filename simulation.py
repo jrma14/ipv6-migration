@@ -7,6 +7,13 @@ from NetworkTopo import NetworkTopo
 from MyTopo import MyTopology
 from RouterTopo import RouterTopo
 import os
+import re
+
+RED = '\033[91m'
+GREEN = '\033[92m'
+YELLOW = '\033[93m'
+BLUE = '\033[94m'
+RESET = '\033[0m'
 
 def ipv6_lan_simulation():
     topo = MyTopology()
@@ -48,6 +55,50 @@ def ipv6_2hop_simulation():
     print(h1.cmd('ping -c 3 2001:db8::2'))
     CLI(net)
     net.stop()
+
+def parse_ping_output(ping_output):
+    # Define a regular expression pattern to extract relevant information
+    pattern = r'(\d+) packets transmitted, (\d+) received, (\d+%).*time (\d+)ms.*rtt min/avg/max/mdev = ([\d.]+)/([\d.]+)/([\d.]+)/([\d.]+) ms'
+
+    match = re.search(pattern, ping_output,re.DOTALL)
+    if match:
+        # Extract relevant groups from the match object
+        transmitted, received, packet_loss, time_ms, rtt_min, rtt_avg, rtt_max, rtt_mdev = match.groups()
+
+        # Convert strings to appropriate data types
+        transmitted = int(transmitted)
+        received = int(received)
+        packet_loss = int(float(packet_loss.rstrip('%')))
+        time_ms = int(time_ms)
+        rtt_min = float(rtt_min)
+        rtt_avg = float(rtt_avg)
+        rtt_max = float(rtt_max)
+        rtt_mdev = float(rtt_mdev)
+
+        # Return a dictionary with parsed information
+        return {
+            'transmitted': transmitted,
+            'received': received,
+            'packet_loss': packet_loss,
+            'time_ms': time_ms,
+            'rtt_min': rtt_min,
+            'rtt_avg': rtt_avg,
+            'rtt_max': rtt_max,
+            'rtt_mdev': rtt_mdev
+        }
+    else:
+        # Return None if no match is found
+        return None
+
+def printPingStats(parsed_data):
+    if parsed_data:
+        print(f"Transmitted: {parsed_data['transmitted']}")
+        print(f"Received: {parsed_data['received']}")
+        print(f"Packet Loss: {parsed_data['packet_loss']}%")
+        print(f"Time: {parsed_data['time_ms']}ms")
+        print(f"RTT Min/Avg/Max/Mdev: {parsed_data['rtt_min']}/{parsed_data['rtt_avg']}/{parsed_data['rtt_max']}/{parsed_data['rtt_mdev']} ms")
+    else:
+        print("No match found in ping output.")
 
 def ipv6_cross_router():
     topo = RouterTopo()
@@ -100,6 +151,17 @@ def ipv6_cross_router():
     h3.cmd(f'ip -6 addr add {subnet1}1:2/64 dev h3-eth0')
     h3.cmd(f'ip -6 route add default via {subnet1}1:0')
 
+    ping4Stats = h1.cmd('ping -c 4',h2.IP())
+    ping6Stats = h1.cmd(f'ping6 -c 4 {subnet2}1:1')
+
+    parsed_data = parse_ping_output(ping4Stats)
+    parsed_6_data = parse_ping_output(ping6Stats)
+    print(RED,'IPv4')
+    printPingStats(parsed_data)
+    print(RESET)
+    print('IPv6')
+    printPingStats(parsed_6_data)
+    
     CLI(net)
 
     net.stop()
